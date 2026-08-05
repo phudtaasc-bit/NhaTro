@@ -35,11 +35,9 @@ function NT_taoHoacCapNhatSheetThang_(monthDate, isUpdate) {
   const groups = NT_lapNhomThueTrongThang_(allRecords, monthDate);
 
   const prevSheet = NT_timSheetThangTruoc_(ss, monthDate);
-  const prevState = prevSheet
-    ? NT_docTrangThaiThangTruoc_(prevSheet)
-    : {};
-
+  const prevState = prevSheet ? NT_docTrangThaiThangTruoc_(prevSheet) : {};
   const config = NT_layCauHinhThang_(monthDate);
+
   const rows = NT_taoDuLieuThang_(
     groups,
     monthDate,
@@ -49,12 +47,8 @@ function NT_taoHoacCapNhatSheetThang_(monthDate, isUpdate) {
   );
 
   if (rows.length > 0) {
-    targetSheet.getRange(
-      NT.MONTH_DATA_ROW,
-      1,
-      rows.length,
-      NT.MONTH_COLS
-    ).setValues(rows);
+    targetSheet.getRange(NT.MONTH_DATA_ROW, 1, rows.length, NT.MONTH_COLS)
+      .setValues(rows);
   }
 
   NT_apDungCongThucVaDinhDang_(targetSheet, monthDate);
@@ -64,12 +58,11 @@ function NT_taoHoacCapNhatSheetThang_(monthDate, isUpdate) {
   SpreadsheetApp.flush();
 
   SpreadsheetApp.getUi().alert(
-    (isUpdate ? 'Đã cập nhật ' : 'Đã tạo ') +
-    targetName +
-    '.\nSố dòng người thuê: ' +
-    rows.length
+    (isUpdate ? 'Đã cập nhật ' : 'Đã tạo ') + targetName +
+    '.\nSố dòng người thuê: ' + rows.length
   );
 }
+
 function NT_taoDuLieuThang_(groups, monthDate, config, prevState, manualSnapshot) {
   const daysInMonth = new Date(
     monthDate.getFullYear(),
@@ -78,68 +71,59 @@ function NT_taoDuLieuThang_(groups, monthDate, config, prevState, manualSnapshot
   ).getDate();
 
   const rows = [];
-  let stt = 1;
 
   groups.forEach(group => {
     const occupiedDays = NT_daysInclusive_(group.start, group.end);
-    const proratedRent = Math.round(
-      (group.rent || 0) * occupiedDays / daysInMonth
-    );
+    const proratedRent = Math.round((group.rent || 0) * occupiedDays / daysInMonth);
+    const validPeople = (group.people || []).filter(person => {
+      return NT_coGiaTri_(NT_text_(person.name)) || NT_coGiaTri_(NT_text_(person.id));
+    });
 
-    const peopleCount = group.people.length;
+    if (validPeople.length === 0) return;
+
+    const peopleCount = validPeople.length;
     const prorateFee = String(config.prorateFee).toUpperCase() === 'CÓ';
-    const trashFee = prorateFee
-      ? Math.round(config.trashFee * peopleCount * occupiedDays / daysInMonth)
-      : config.trashFee * peopleCount;
-
     const roomPrev = prevState[group.room] || {};
     const roomManual = manualSnapshot.byRoom[group.room] || {};
 
     const oldElectric = group.isLastGroupOfRoom
-      ? NT_firstNumber_(
-          roomPrev.nextElectric,
-          roomPrev.oldElectric,
-          roomManual.oldElectric
-        )
+      ? NT_firstNumber_(roomPrev.nextElectric, roomPrev.oldElectric, roomManual.oldElectric)
       : '';
 
     const oldWater = group.isLastGroupOfRoom
-      ? NT_firstNumber_(
-          roomPrev.nextWater,
-          roomPrev.oldWater,
-          roomManual.oldWater
-        )
+      ? NT_firstNumber_(roomPrev.nextWater, roomPrev.oldWater, roomManual.oldWater)
       : '';
 
-    const carryDebt = group.isLastGroupOfRoom
-      ? NT_asNumber_(roomPrev.debt)
-      : 0;
+    const carryDebt = group.isLastGroupOfRoom ? NT_asNumber_(roomPrev.debt) : 0;
 
-    group.people.forEach((person, personIndex) => {
+    validPeople.forEach((person, personIndex) => {
+      const personName = NT_text_(person.name);
+      const personId = NT_text_(person.id);
+      if (!personName && !personId) return;
+
       const leader = personIndex === 0;
-      const personKey = NT_khoaDongThang_(group.room, person.id, person.name);
+      const personKey = NT_khoaDongThang_(group.room, personId, personName);
       const saved = manualSnapshot.byPerson[personKey] || {};
-
       const row = new Array(NT.MONTH_COLS).fill('');
 
-      row[0] = stt++;
+      // STT chỉ cấp sau khi xác nhận đây là một dòng khách hợp lệ.
+      row[0] = rows.length + 1;
       row[1] = NT_tangTuPhong_(group.room);
       row[2] = leader ? group.room : '';
-      row[3] = person.name;
-      row[4] = person.id;
+      row[3] = personName;
+      row[4] = personId;
       row[5] = NT_ghepThuongTru_(person);
       row[6] = person.contractDate || '';
       row[7] = person.effectiveDate || '';
       row[8] = person.contractEnd || '';
+
       if (!person.residenceDeadline) {
         row[9] = 'Chưa đăng ký';
       } else {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-
         const deadline = new Date(person.residenceDeadline);
         deadline.setHours(0, 0, 0, 0);
-
         row[9] = deadline < today ? 'Hết hạn' : 'Đã có';
       }
       row[10] = person.residenceDeadline || '';
@@ -149,27 +133,10 @@ function NT_taoDuLieuThang_(groups, monthDate, config, prevState, manualSnapshot
         const cfgSheet = "'" + NT.CONFIG_SHEET.replace(/'/g, "''") + "'";
 
         if (prorateFee) {
-          row[11] =
-            '=ROUND(' +
-            peopleCount +
-            '*' +
-            cfgSheet +
-            '!$D$' +
-            cfgRow +
-            '*' +
-            occupiedDays +
-            '/' +
-            daysInMonth +
-            NT_formulaSeparator_() +
-            '0)';
+          row[11] = '=ROUND(' + peopleCount + '*' + cfgSheet + '!$D$' + cfgRow + '*' +
+            occupiedDays + '/' + daysInMonth + NT_formulaSeparator_() + '0)';
         } else {
-          row[11] =
-            '=' +
-            peopleCount +
-            '*' +
-            cfgSheet +
-            '!$D$' +
-            cfgRow;
+          row[11] = '=' + peopleCount + '*' + cfgSheet + '!$D$' + cfgRow;
         }
 
         row[12] = group.deposit || '';
@@ -177,13 +144,9 @@ function NT_taoDuLieuThang_(groups, monthDate, config, prevState, manualSnapshot
 
         if (group.isLastGroupOfRoom) {
           row[14] = oldElectric;
-          row[15] = NT_coGiaTri_(saved.newElectric)
-            ? saved.newElectric
-            : '';
+          row[15] = NT_coGiaTri_(saved.newElectric) ? saved.newElectric : '';
           row[17] = oldWater;
-          row[18] = NT_coGiaTri_(saved.newWater)
-            ? saved.newWater
-            : '';
+          row[18] = NT_coGiaTri_(saved.newWater) ? saved.newWater : '';
         }
 
         row[21] = NT_coGiaTri_(saved.paid) ? saved.paid : '';
@@ -205,6 +168,7 @@ function NT_taoDuLieuThang_(groups, monthDate, config, prevState, manualSnapshot
 
   return rows;
 }
+
 function NT_luuDuLieuNhapTay_(sheet) {
   const lastRow = NT_layDongCuoiDuLieuThang_(sheet);
   const result = { byPerson: {}, byRoom: {} };
@@ -218,17 +182,11 @@ function NT_luuDuLieuNhapTay_(sheet) {
   ).getValues();
 
   let currentRoom = '';
-
   values.forEach(r => {
     if (NT_coGiaTri_(r[2])) currentRoom = NT_chuanHoaPhong_(r[2]);
     if (!currentRoom) return;
 
-    const personKey = NT_khoaDongThang_(
-      currentRoom,
-      NT_text_(r[4]),
-      NT_text_(r[3])
-    );
-
+    const personKey = NT_khoaDongThang_(currentRoom, NT_text_(r[4]), NT_text_(r[3]));
     result.byPerson[personKey] = {
       newElectric: r[15],
       newWater: r[18],
@@ -238,7 +196,6 @@ function NT_luuDuLieuNhapTay_(sheet) {
     };
 
     if (!result.byRoom[currentRoom]) result.byRoom[currentRoom] = {};
-
     if (NT_coGiaTri_(r[14])) result.byRoom[currentRoom].oldElectric = r[14];
     if (NT_coGiaTri_(r[15])) result.byRoom[currentRoom].newElectric = r[15];
     if (NT_coGiaTri_(r[17])) result.byRoom[currentRoom].oldWater = r[17];
@@ -247,6 +204,7 @@ function NT_luuDuLieuNhapTay_(sheet) {
 
   return result;
 }
+
 function NT_docTrangThaiThangTruoc_(sheet) {
   const lastRow = NT_layDongCuoiDuLieuThang_(sheet);
   const map = {};
@@ -260,7 +218,6 @@ function NT_docTrangThaiThangTruoc_(sheet) {
   ).getValues();
 
   let currentRoom = '';
-
   values.forEach(r => {
     if (NT_coGiaTri_(r[2])) currentRoom = NT_chuanHoaPhong_(r[2]);
     if (!currentRoom) return;
@@ -286,33 +243,15 @@ function NT_docTrangThaiThangTruoc_(sheet) {
 
   return map;
 }
+
 function NT_taoKhungSheetThang_(sheet) {
   const headers = [
-    'STT',
-    'Tầng',
-    'Phòng',
-    'Tên người thuê',
-    'CCCD',
-    'Thường trú',
-    'Ngày hợp đồng',
-    'Ngày hiệu lực',
-    'Ngày hết hạn',
-    'Đăng ký tạm trú',
-    'Hạn đăng ký tạm trú',
-    'Thu phí tạm trú/rác',
-    'Tiền cọc',
-    'Tiền phòng',
-    'Số điện cũ',
-    'Số điện mới',
-    'Tiền điện (3k)',
-    'Số nước cũ',
-    'Số nước mới',
-    'Tiền nước (10K)',
-    'Tiền phải thu',
-    'Đã nộp',
-    'Hình thức nạp',
-    'Tiền còn nợ',
-    'Ghi chú'
+    'STT', 'Tầng', 'Phòng', 'Tên người thuê', 'CCCD', 'Thường trú',
+    'Ngày hợp đồng', 'Ngày hiệu lực', 'Ngày hết hạn', 'Đăng ký tạm trú',
+    'Hạn đăng ký tạm trú', 'Thu phí tạm trú/rác', 'Tiền cọc', 'Tiền phòng',
+    'Số điện cũ', 'Số điện mới', 'Tiền điện (3k)', 'Số nước cũ',
+    'Số nước mới', 'Tiền nước (10K)', 'Tiền phải thu', 'Đã nộp',
+    'Hình thức nạp', 'Tiền còn nợ', 'Ghi chú'
   ];
 
   sheet.getRange(NT.MONTH_HEADER_ROW, 1, 1, headers.length).setValues([headers]);
@@ -322,21 +261,16 @@ function NT_taoKhungSheetThang_(sheet) {
     .setVerticalAlignment('middle')
     .setWrap(true)
     .setBackground(NT.HEADER_COLOR);
-
   sheet.setRowHeight(NT.MONTH_HEADER_ROW, 55);
 }
+
 function NT_chuanBiSheetThang_(sheet) {
   if (sheet.getMaxColumns() < NT.MONTH_COLS) {
-    sheet.insertColumnsAfter(
-      sheet.getMaxColumns(),
-      NT.MONTH_COLS - sheet.getMaxColumns()
-    );
+    sheet.insertColumnsAfter(sheet.getMaxColumns(), NT.MONTH_COLS - sheet.getMaxColumns());
   }
 
   const oldHeader = NT_text_(sheet.getRange(1, 1).getDisplayValue()).toUpperCase();
-  const newHeader = NT_text_(
-    sheet.getRange(NT.MONTH_HEADER_ROW, 1).getDisplayValue()
-  ).toUpperCase();
+  const newHeader = NT_text_(sheet.getRange(NT.MONTH_HEADER_ROW, 1).getDisplayValue()).toUpperCase();
 
   if (oldHeader === 'STT' && newHeader !== 'STT') {
     sheet.insertRowsBefore(1, NT.MONTH_HEADER_ROW - 1);
@@ -349,18 +283,8 @@ function NT_chuanBiSheetThang_(sheet) {
     NT_taoKhungSheetThang_(sheet);
   }
 
-  const rowsToClear = Math.max(
-    sheet.getMaxRows() - NT.MONTH_DATA_ROW + 1,
-    1
-  );
-
-  const range = sheet.getRange(
-    NT.MONTH_DATA_ROW,
-    1,
-    rowsToClear,
-    NT.MONTH_COLS
-  );
-
+  const rowsToClear = Math.max(sheet.getMaxRows() - NT.MONTH_DATA_ROW + 1, 1);
+  const range = sheet.getRange(NT.MONTH_DATA_ROW, 1, rowsToClear, NT.MONTH_COLS);
   range.clearContent();
   range.clearDataValidations();
   range.setBackground(NT.AUTO_COLOR);
@@ -370,25 +294,20 @@ function NT_chuanBiSheetThang_(sheet) {
     .clearContent()
     .clearFormat();
 }
+
 function NT_timSheetThangMau_(ss, targetMonth) {
   const previous = NT_timSheetThangTruoc_(ss, targetMonth);
   if (previous) return previous;
-
   const latest = NT_timSheetThangMoiNhat_(ss);
   return latest ? latest.sheet : null;
 }
+
 function NT_timSheetThangMoiNhat_(ss) {
   const found = [];
-
   ss.getSheets().forEach(sheet => {
     const d = NT_layThangTuTenSheet_(sheet.getName());
     if (d) {
-      found.push({
-        sheet: sheet,
-        date: d,
-        year: d.getFullYear(),
-        month: d.getMonth()
-      });
+      found.push({ sheet: sheet, date: d, year: d.getFullYear(), month: d.getMonth() });
     }
   });
 
@@ -396,6 +315,7 @@ function NT_timSheetThangMoiNhat_(ss) {
   found.sort((a, b) => b.date - a.date);
   return found[0];
 }
+
 function NT_timSheetThangTruoc_(ss, monthDate) {
   const prev = new Date(monthDate.getFullYear(), monthDate.getMonth() - 1, 1);
   return ss.getSheetByName(NT_tenSheetThang_(prev));
