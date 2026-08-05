@@ -72,7 +72,8 @@ function NT_taoTongCongVaDashboard_(sheet, monthDate) {
   const dashboard = [
     [
       ['Số phòng phát sinh', '=COUNTUNIQUE(FILTER(C' + NT.MONTH_DATA_ROW + ':C' + lastDataRow + sep + 'C' + NT.MONTH_DATA_ROW + ':C' + lastDataRow + '<>""))'],
-      ['Số khách', '=COUNTA(D' + NT.MONTH_DATA_ROW + ':D' + lastDataRow + ')'],
+      // Tổng số khách được đếm theo cột Tên người thuê (cột D), không phụ thuộc CCCD.
+      ['Tổng số khách', '=COUNTIF(D' + NT.MONTH_DATA_ROW + ':D' + lastDataRow + sep + '"<>")'],
       ['Tiền phòng', '=N' + totalRow],
       ['Tiền điện', '=Q' + totalRow]
     ],
