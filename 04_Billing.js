@@ -120,6 +120,8 @@ function NT_apDungCongThucVaDinhDang_(sheet, monthDate) {
   sheet.getRange(NT.MONTH_DATA_ROW, 15, numRows, 6)
     .setNumberFormat('#,##0.##');
 
+  // Dashboard có các vùng hợp nhất đi qua nhiều cột.
+  // Chỉ cố định hàng tiêu đề, không cố định cột để tránh lỗi Google Sheets.
   sheet.setFrozenRows(NT.MONTH_HEADER_ROW);
-  sheet.setFrozenColumns(3);
+  sheet.setFrozenColumns(0);
 }
