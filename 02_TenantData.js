@@ -104,7 +104,6 @@ function NT_docSheetTraPhong_() {
     if (!carry.room) return;
 
     // Chỉ lấy bản ghi trả phòng khi đã có ngày trả phòng cụ thể.
-    // Nếu ngày trả phòng trống thì không đưa vào bảng tổng hợp tháng.
     if (!carry.returnDate) return;
 
     result.push({
@@ -132,25 +131,54 @@ function NT_docSheetTraPhong_() {
   return result;
 }
 
+/**
+ * Gộp dữ liệu đang thuê và trả phòng mà không làm mất người khi dữ liệu nguồn
+ * có hai người cùng phòng vô tình trùng CCCD/Hộ chiếu.
+ *
+ * Ưu tiên đối chiếu bản ghi trả phòng theo:
+ * 1) Số phòng + CCCD/Hộ chiếu + họ tên;
+ * 2) Số phòng + CCCD/Hộ chiếu, nhưng chỉ khi tìm thấy đúng một người;
+ * 3) Nếu không xác định được thì giữ thành bản ghi riêng.
+ */
 function NT_gopVaLoaiTrungKhach_(currentRecords, returnedRecords) {
-  const map = new Map();
+  const result = currentRecords.map(r => Object.assign({}, r));
+  const usedReturned = new Set();
 
-  currentRecords.forEach(r => {
-    map.set(NT_khoaKhach_(r), r);
-  });
+  returnedRecords.forEach((returned, returnedIndex) => {
+    const returnedRoom = NT_chuanHoaPhong_(returned.room);
+    const returnedId = NT_text_(returned.id).toUpperCase();
+    const returnedName = NT_text_(returned.name).toUpperCase();
 
-  returnedRecords.forEach(r => {
-    const key = NT_khoaKhach_(r);
-    const old = map.get(key);
+    let matches = result
+      .map((record, index) => ({ record: record, index: index }))
+      .filter(item => {
+        return NT_chuanHoaPhong_(item.record.room) === returnedRoom &&
+          NT_text_(item.record.id).toUpperCase() === returnedId &&
+          NT_text_(item.record.name).toUpperCase() === returnedName;
+      });
 
-    // Nếu cùng khách, cùng phòng đã chuyển sang sheet Trả phòng thì dùng
-    // ngày trả phòng để giới hạn thời gian tính tiền trong tháng.
-    if (!old || r.returnDate) {
-      map.set(key, r);
+    if (matches.length === 0 && returnedId) {
+      matches = result
+        .map((record, index) => ({ record: record, index: index }))
+        .filter(item => {
+          return NT_chuanHoaPhong_(item.record.room) === returnedRoom &&
+            NT_text_(item.record.id).toUpperCase() === returnedId;
+        });
+    }
+
+    if (matches.length === 1) {
+      result[matches[0].index] = Object.assign({}, returned);
+      usedReturned.add(returnedIndex);
     }
   });
 
-  return Array.from(map.values());
+  returnedRecords.forEach((returned, index) => {
+    if (!usedReturned.has(index)) {
+      result.push(Object.assign({}, returned));
+    }
+  });
+
+  return result;
 }
 
 function NT_lapNhomThueTrongThang_(records, monthDate) {
@@ -165,6 +193,7 @@ function NT_lapNhomThueTrongThang_(records, monthDate) {
       ? NT_minDate_(r.returnDate, monthEnd)
       : monthEnd;
 
+    // Khách trả phòng trong tháng vẫn được đưa vào tổng hợp và tính đến ngày trả.
     if (effective > monthEnd) return;
     if (r.returnDate && r.returnDate < monthStart) return;
     if (end < start) return;
@@ -226,13 +255,13 @@ function NT_lapNhomThueTrongThang_(records, monthDate) {
 
 /**
  * Đếm số phòng trống tại ngày cuối tháng báo cáo.
- * Phòng được xem là trống khi đã xuất hiện trong dữ liệu quản lý nhưng
- * không còn khách đang thuê tại ngày cuối tháng.
+ * Phòng trống khi không còn bất kỳ khách nào có thời gian thuê bao phủ ngày cuối tháng.
  */
 function NT_demPhongTrongCuoiThang_(monthDate) {
   const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
   const currentRecords = NT_docSheetDangThue_();
   const returnedRecords = NT_docSheetTraPhong_();
+  const mergedRecords = NT_gopVaLoaiTrungKhach_(currentRecords, returnedRecords);
 
   const allRooms = new Set();
   currentRecords.forEach(r => r.room && allRooms.add(r.room));
@@ -240,16 +269,14 @@ function NT_demPhongTrongCuoiThang_(monthDate) {
 
   const occupiedRooms = new Set();
 
-  currentRecords.forEach(r => {
-    const effective = r.effectiveDate || r.contractDate;
-    if (!effective || effective <= monthEnd) {
-      occupiedRooms.add(r.room);
-    }
-  });
+  mergedRecords.forEach(r => {
+    if (!r.room) return;
 
-  returnedRecords.forEach(r => {
     const effective = r.effectiveDate || r.contractDate;
-    if (effective && effective <= monthEnd && r.returnDate && r.returnDate > monthEnd) {
+    const startedByMonthEnd = !effective || effective <= monthEnd;
+    const notReturnedByMonthEnd = !r.returnDate || r.returnDate > monthEnd;
+
+    if (startedByMonthEnd && notReturnedByMonthEnd) {
       occupiedRooms.add(r.room);
     }
   });
