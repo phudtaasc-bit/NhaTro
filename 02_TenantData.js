@@ -13,20 +13,24 @@ function NT_docSheetDangThue_() {
   const lastRow = sheet.getLastRow();
   if (lastRow < NT.SOURCE_DATA_ROW) return [];
 
-  const values = sheet.getRange(
+  const range = sheet.getRange(
     NT.SOURCE_DATA_ROW,
     1,
     lastRow - NT.SOURCE_DATA_ROW + 1,
     15
-  ).getValues();
+  );
+  const values = range.getValues();
+  const displayValues = range.getDisplayValues();
 
   const result = [];
   let carry = {};
 
   values.forEach((r, index) => {
-    if (NT_coGiaTri_(r[0])) {
+    const d = displayValues[index];
+
+    if (NT_coGiaTri_(d[0])) {
       carry = {
-        room: NT_chuanHoaPhong_(r[0]),
+        room: NT_chuanHoaPhong_(d[0]),
         contractDate: NT_asDate_(r[1]),
         effectiveDate: NT_asDate_(r[2]),
         contractEnd: NT_asDate_(r[3]),
@@ -36,8 +40,10 @@ function NT_docSheetDangThue_() {
       };
     }
 
-    const name = NT_text_(r[7]);
-    const id = NT_text_(r[10]);
+    // Dùng giá trị hiển thị cho các trường văn bản để không mất tên/CCCD
+    // do định dạng số, công thức hoặc kiểu dữ liệu đặc biệt trong sheet nguồn.
+    const name = NT_text_(d[7]);
+    const id = NT_text_(d[10]);
     if (!name && !id) return;
     if (!carry.room) return;
 
@@ -53,12 +59,12 @@ function NT_docSheetDangThue_() {
       rent: carry.rent,
       deposit: carry.deposit,
       name: name,
-      phone: NT_text_(r[8]),
+      phone: NT_text_(d[8]),
       dob: NT_asDate_(r[9]),
       id: id,
-      commune: NT_text_(r[11]),
-      district: NT_text_(r[12]),
-      province: NT_text_(r[13]),
+      commune: NT_text_(d[11]),
+      district: NT_text_(d[12]),
+      province: NT_text_(d[13]),
       residenceDeadline: NT_asDate_(r[14])
     });
   });
@@ -74,20 +80,24 @@ function NT_docSheetTraPhong_() {
   const lastRow = sheet.getLastRow();
   if (lastRow < NT.SOURCE_DATA_ROW) return [];
 
-  const values = sheet.getRange(
+  const range = sheet.getRange(
     NT.SOURCE_DATA_ROW,
     1,
     lastRow - NT.SOURCE_DATA_ROW + 1,
     16
-  ).getValues();
+  );
+  const values = range.getValues();
+  const displayValues = range.getDisplayValues();
 
   const result = [];
   let carry = {};
 
   values.forEach((r, index) => {
-    if (NT_coGiaTri_(r[0])) {
+    const d = displayValues[index];
+
+    if (NT_coGiaTri_(d[0])) {
       carry = {
-        room: NT_chuanHoaPhong_(r[0]),
+        room: NT_chuanHoaPhong_(d[0]),
         contractDate: NT_asDate_(r[1]),
         effectiveDate: NT_asDate_(r[2]),
         contractEnd: NT_asDate_(r[3]),
@@ -98,12 +108,10 @@ function NT_docSheetTraPhong_() {
       };
     }
 
-    const name = NT_text_(r[8]);
-    const id = NT_text_(r[11]);
+    const name = NT_text_(d[8]);
+    const id = NT_text_(d[11]);
     if (!name && !id) return;
     if (!carry.room) return;
-
-    // Chỉ lấy bản ghi trả phòng khi đã có ngày trả phòng cụ thể.
     if (!carry.returnDate) return;
 
     result.push({
@@ -118,12 +126,12 @@ function NT_docSheetTraPhong_() {
       rent: carry.rent,
       deposit: carry.deposit,
       name: name,
-      phone: NT_text_(r[9]),
+      phone: NT_text_(d[9]),
       dob: NT_asDate_(r[10]),
       id: id,
-      commune: NT_text_(r[12]),
-      district: NT_text_(r[13]),
-      province: NT_text_(r[14]),
+      commune: NT_text_(d[12]),
+      district: NT_text_(d[13]),
+      province: NT_text_(d[14]),
       residenceDeadline: NT_asDate_(r[15])
     });
   });
@@ -131,15 +139,6 @@ function NT_docSheetTraPhong_() {
   return result;
 }
 
-/**
- * Gộp dữ liệu đang thuê và trả phòng mà không làm mất người khi dữ liệu nguồn
- * có hai người cùng phòng vô tình trùng CCCD/Hộ chiếu.
- *
- * Ưu tiên đối chiếu bản ghi trả phòng theo:
- * 1) Số phòng + CCCD/Hộ chiếu + họ tên;
- * 2) Số phòng + CCCD/Hộ chiếu, nhưng chỉ khi tìm thấy đúng một người;
- * 3) Nếu không xác định được thì giữ thành bản ghi riêng.
- */
 function NT_gopVaLoaiTrungKhach_(currentRecords, returnedRecords) {
   const result = currentRecords.map(r => Object.assign({}, r));
   const usedReturned = new Set();
@@ -151,19 +150,19 @@ function NT_gopVaLoaiTrungKhach_(currentRecords, returnedRecords) {
 
     let matches = result
       .map((record, index) => ({ record: record, index: index }))
-      .filter(item => {
-        return NT_chuanHoaPhong_(item.record.room) === returnedRoom &&
-          NT_text_(item.record.id).toUpperCase() === returnedId &&
-          NT_text_(item.record.name).toUpperCase() === returnedName;
-      });
+      .filter(item =>
+        NT_chuanHoaPhong_(item.record.room) === returnedRoom &&
+        NT_text_(item.record.id).toUpperCase() === returnedId &&
+        NT_text_(item.record.name).toUpperCase() === returnedName
+      );
 
     if (matches.length === 0 && returnedId) {
       matches = result
         .map((record, index) => ({ record: record, index: index }))
-        .filter(item => {
-          return NT_chuanHoaPhong_(item.record.room) === returnedRoom &&
-            NT_text_(item.record.id).toUpperCase() === returnedId;
-        });
+        .filter(item =>
+          NT_chuanHoaPhong_(item.record.room) === returnedRoom &&
+          NT_text_(item.record.id).toUpperCase() === returnedId
+        );
     }
 
     if (matches.length === 1) {
@@ -173,9 +172,7 @@ function NT_gopVaLoaiTrungKhach_(currentRecords, returnedRecords) {
   });
 
   returnedRecords.forEach((returned, index) => {
-    if (!usedReturned.has(index)) {
-      result.push(Object.assign({}, returned));
-    }
+    if (!usedReturned.has(index)) result.push(Object.assign({}, returned));
   });
 
   return result;
@@ -187,13 +184,13 @@ function NT_lapNhomThueTrongThang_(records, monthDate) {
   const map = new Map();
 
   records.forEach(r => {
+    // Không tạo dòng rỗng trong bảng tháng.
+    if (!NT_text_(r.name) && !NT_text_(r.id)) return;
+
     const effective = r.effectiveDate || r.contractDate || monthStart;
     const start = NT_maxDate_(effective, monthStart);
-    const end = r.returnDate
-      ? NT_minDate_(r.returnDate, monthEnd)
-      : monthEnd;
+    const end = r.returnDate ? NT_minDate_(r.returnDate, monthEnd) : monthEnd;
 
-    // Khách trả phòng trong tháng vẫn được đưa vào tổng hợp và tính đến ngày trả.
     if (effective > monthEnd) return;
     if (r.returnDate && r.returnDate < monthStart) return;
     if (end < start) return;
@@ -227,11 +224,9 @@ function NT_lapNhomThueTrongThang_(records, monthDate) {
   });
 
   const groups = Array.from(map.values());
-
   groups.sort((a, b) => {
     const roomDiff = NT_roomSort_(a.room) - NT_roomSort_(b.room);
-    if (roomDiff !== 0) return roomDiff;
-    return a.start - b.start;
+    return roomDiff !== 0 ? roomDiff : a.start - b.start;
   });
 
   const byRoom = {};
@@ -253,10 +248,6 @@ function NT_lapNhomThueTrongThang_(records, monthDate) {
   return groups;
 }
 
-/**
- * Đếm số phòng trống tại ngày cuối tháng báo cáo.
- * Phòng trống khi không còn bất kỳ khách nào có thời gian thuê bao phủ ngày cuối tháng.
- */
 function NT_demPhongTrongCuoiThang_(monthDate) {
   const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
   const currentRecords = NT_docSheetDangThue_();
@@ -268,23 +259,17 @@ function NT_demPhongTrongCuoiThang_(monthDate) {
   returnedRecords.forEach(r => r.room && allRooms.add(r.room));
 
   const occupiedRooms = new Set();
-
   mergedRecords.forEach(r => {
     if (!r.room) return;
-
     const effective = r.effectiveDate || r.contractDate;
     const startedByMonthEnd = !effective || effective <= monthEnd;
     const notReturnedByMonthEnd = !r.returnDate || r.returnDate > monthEnd;
-
-    if (startedByMonthEnd && notReturnedByMonthEnd) {
-      occupiedRooms.add(r.room);
-    }
+    if (startedByMonthEnd && notReturnedByMonthEnd) occupiedRooms.add(r.room);
   });
 
   let vacant = 0;
   allRooms.forEach(room => {
     if (!occupiedRooms.has(room)) vacant++;
   });
-
   return vacant;
 }
