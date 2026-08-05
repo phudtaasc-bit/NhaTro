@@ -7,7 +7,7 @@ function NT_dinhDangBaoCaoThang_(sheet) {
   const numRows = Math.max(lastDataRow - NT.MONTH_DATA_ROW + 1, 1);
   const widths = {1:55,2:55,3:70,4:165,5:120,6:220,7:90,8:90,9:90,10:115,11:105,12:120,13:95,14:95,15:80,16:80,17:110,18:80,19:80,20:110,21:115,22:105,23:110,24:115,25:220};
   Object.keys(widths).forEach(col => sheet.setColumnWidth(Number(col), widths[col]));
-  sheet.setRowHeights(1,4,26);
+  sheet.setRowHeights(1,4,30);
   sheet.setRowHeight(1,32);
   sheet.setRowHeight(NT.MONTH_HEADER_ROW,58);
   if (lastDataRow >= NT.MONTH_DATA_ROW) sheet.setRowHeights(NT.MONTH_DATA_ROW,numRows,24);
@@ -39,7 +39,9 @@ function NT_dinhDangBaoCaoThang_(sheet) {
     SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('Đã có').setBackground('#d9ead3').setFontColor('#274e13').setRanges([statusRange]).build()
   ];
   sheet.setConditionalFormatRules(existingRules.concat(statusRules));
+
+  // Dashboard có nhiều vùng hợp nhất trải ngang qua các cột, vì vậy chỉ cố định hàng.
   sheet.setFrozenRows(NT.MONTH_HEADER_ROW);
-  sheet.setFrozenColumns(3);
+  sheet.setFrozenColumns(0);
   sheet.setHiddenGridlines(true);
 }
