@@ -65,6 +65,7 @@ function NT_docSheetDangThue_() {
 
   return result;
 }
+
 function NT_docSheetTraPhong_() {
   const ss = SpreadsheetApp.getActive();
   const sheet = ss.getSheetByName(NT.SOURCE_RETURNED);
@@ -102,6 +103,10 @@ function NT_docSheetTraPhong_() {
     if (!name && !id) return;
     if (!carry.room) return;
 
+    // Chỉ lấy bản ghi trả phòng khi đã có ngày trả phòng cụ thể.
+    // Nếu ngày trả phòng trống thì không đưa vào bảng tổng hợp tháng.
+    if (!carry.returnDate) return;
+
     result.push({
       source: NT.SOURCE_RETURNED,
       sourceRow: NT.SOURCE_DATA_ROW + index,
@@ -126,6 +131,7 @@ function NT_docSheetTraPhong_() {
 
   return result;
 }
+
 function NT_gopVaLoaiTrungKhach_(currentRecords, returnedRecords) {
   const map = new Map();
 
@@ -137,6 +143,8 @@ function NT_gopVaLoaiTrungKhach_(currentRecords, returnedRecords) {
     const key = NT_khoaKhach_(r);
     const old = map.get(key);
 
+    // Nếu cùng khách, cùng phòng đã chuyển sang sheet Trả phòng thì dùng
+    // ngày trả phòng để giới hạn thời gian tính tiền trong tháng.
     if (!old || r.returnDate) {
       map.set(key, r);
     }
@@ -144,6 +152,7 @@ function NT_gopVaLoaiTrungKhach_(currentRecords, returnedRecords) {
 
   return Array.from(map.values());
 }
+
 function NT_lapNhomThueTrongThang_(records, monthDate) {
   const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
   const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
@@ -213,4 +222,42 @@ function NT_lapNhomThueTrongThang_(records, monthDate) {
   });
 
   return groups;
+}
+
+/**
+ * Đếm số phòng trống tại ngày cuối tháng báo cáo.
+ * Phòng được xem là trống khi đã xuất hiện trong dữ liệu quản lý nhưng
+ * không còn khách đang thuê tại ngày cuối tháng.
+ */
+function NT_demPhongTrongCuoiThang_(monthDate) {
+  const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+  const currentRecords = NT_docSheetDangThue_();
+  const returnedRecords = NT_docSheetTraPhong_();
+
+  const allRooms = new Set();
+  currentRecords.forEach(r => r.room && allRooms.add(r.room));
+  returnedRecords.forEach(r => r.room && allRooms.add(r.room));
+
+  const occupiedRooms = new Set();
+
+  currentRecords.forEach(r => {
+    const effective = r.effectiveDate || r.contractDate;
+    if (!effective || effective <= monthEnd) {
+      occupiedRooms.add(r.room);
+    }
+  });
+
+  returnedRecords.forEach(r => {
+    const effective = r.effectiveDate || r.contractDate;
+    if (effective && effective <= monthEnd && r.returnDate && r.returnDate > monthEnd) {
+      occupiedRooms.add(r.room);
+    }
+  });
+
+  let vacant = 0;
+  allRooms.forEach(room => {
+    if (!occupiedRooms.has(room)) vacant++;
+  });
+
+  return vacant;
 }
