@@ -5,7 +5,7 @@ function NT_dinhDangBaoCaoThang_(sheet) {
   const lastDataRow = NT_layDongCuoiDuLieuThang_(sheet);
   const totalRow = lastDataRow + 1;
   const numRows = Math.max(lastDataRow - NT.MONTH_DATA_ROW + 1, 1);
-  const widths = {1:55,2:55,3:70,4:165,5:120,6:220,7:90,8:90,9:90,10:115,11:105,12:120,13:95,14:95,15:80,16:80,17:110,18:80,19:80,20:110,21:115,22:105,23:110,24:115,25:220};
+  const widths = {1:55,2:55,3:70,4:165,5:145,6:220,7:90,8:90,9:90,10:115,11:105,12:120,13:95,14:95,15:80,16:80,17:110,18:80,19:80,20:110,21:115,22:105,23:110,24:115,25:220};
   Object.keys(widths).forEach(col => sheet.setColumnWidth(Number(col), widths[col]));
   sheet.setRowHeights(1,4,30);
   sheet.setRowHeight(1,32);
@@ -31,14 +31,37 @@ function NT_dinhDangBaoCaoThang_(sheet) {
   sheet.getRange(NT.MONTH_DATA_ROW,19,numRows,1).setBackground(NT.MANUAL_COLOR);
   sheet.getRange(NT.MONTH_DATA_ROW,22,numRows,2).setBackground(NT.MANUAL_COLOR);
   sheet.getRange(NT.MONTH_DATA_ROW,25,numRows,1).setBackground(NT.MANUAL_COLOR);
+
   const statusRange = sheet.getRange(NT.MONTH_DATA_ROW,10,numRows,1);
-  const existingRules = sheet.getConditionalFormatRules().filter(rule => !rule.getRanges().some(r => r.getColumn() === 10));
+  const cccdRange = sheet.getRange(NT.MONTH_DATA_ROW,5,numRows,1);
+  const existingRules = sheet.getConditionalFormatRules().filter(rule =>
+    !rule.getRanges().some(r => r.getColumn() === 10 || r.getColumn() === 5)
+  );
+
   const statusRules = [
     SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('Chưa đăng ký').setBackground('#f4cccc').setFontColor('#990000').setRanges([statusRange]).build(),
     SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('Hết hạn').setBackground('#ffe599').setFontColor('#7f6000').setRanges([statusRange]).build(),
-    SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('Đã có').setBackground('#d9ead3').setFontColor('#274e13').setRanges([statusRange]).build()
+    SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('Đã có').setBackground('#d9ead3').setFontColor('#274e13').setRanges([statusRange]).build(),
+
+    // Cảnh báo tại cột CCCD/Hộ chiếu khi có tên khách nhưng chưa có giấy tờ.
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied('=AND($D' + NT.MONTH_DATA_ROW + '<>"",$E' + NT.MONTH_DATA_ROW + '="")')
+      .setBackground('#f4cccc')
+      .setFontColor('#990000')
+      .setRanges([cccdRange])
+      .build()
   ];
   sheet.setConditionalFormatRules(existingRules.concat(statusRules));
+
+  // Gắn ghi chú trực tiếp vào ô CCCD còn trống để người dùng nhận biết khi di chuột.
+  const names = sheet.getRange(NT.MONTH_DATA_ROW,4,numRows,1).getDisplayValues();
+  const ids = cccdRange.getDisplayValues();
+  const notes = names.map((row, index) => [
+    row[0] && !ids[index][0]
+      ? 'CẢNH BÁO: Khách này chưa có CCCD/Hộ chiếu trong dữ liệu nguồn.'
+      : null
+  ]);
+  cccdRange.setNotes(notes);
 
   // Dashboard có nhiều vùng hợp nhất trải ngang qua các cột, vì vậy chỉ cố định hàng.
   sheet.setFrozenRows(NT.MONTH_HEADER_ROW);
