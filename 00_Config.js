@@ -8,6 +8,7 @@
 const NT = {
   SOURCE_CURRENT: 'TH thuê trọ',
   SOURCE_RETURNED: 'Trả phòng',
+  METER_SHEET: 'Số điện, nước',
   CONFIG_SHEET: 'CẤU HÌNH',
   MONTH_PREFIX: 'Tháng ',
   SOURCE_HEADER_ROW: 3,
@@ -17,6 +18,7 @@ const NT = {
   MONTH_COLS: 25,
   MANUAL_COLOR: '#fff2cc',
   AUTO_COLOR: '#ffffff',
+  ALT_ROOM_COLOR: '#eef5fb',
   HEADER_COLOR: '#d9eaf7',
   CURRENCY_FORMAT: '#,##0',
   DATE_FORMAT: 'd/m/yyyy',
