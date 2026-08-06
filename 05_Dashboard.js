@@ -57,7 +57,7 @@ function NT_taoTongCongVaDashboard_(sheet, monthDate) {
       ['Còn phải thu', '=X' + totalRow],
       ['Số phòng trống', '=' + vacantRooms],
       ['Khách chưa đăng ký tạm trú', '=COUNTIF(J' + NT.MONTH_DATA_ROW + ':J' + lastDataRow + sep + '"Chưa đăng ký")'],
-      ['Khách hết hạn đăng ký tạm trú', '=COUNTIF(J' + NT.MONTH_DATA_ROW + ':J' + lastDataRow + sep + '"Hết hạn")']
+      ['Khách hết hạn đăng ký tạm trú', '=COUNTIF(J' + NT.MONTH_DATA_ROW + ':J' + lastDataRow + sep + '"Hết hạn*")']
     ]
   ];
 
