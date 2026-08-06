@@ -37,13 +37,15 @@ function NT_taoHoacCapNhatSheetThang_(monthDate, isUpdate) {
   const prevSheet = NT_timSheetThangTruoc_(ss, monthDate);
   const prevState = prevSheet ? NT_docTrangThaiThangTruoc_(prevSheet) : {};
   const config = NT_layCauHinhThang_(monthDate);
+  const meterState = NT_docChiSoDienNuocThang_(monthDate);
 
   const rows = NT_taoDuLieuThang_(
     groups,
     monthDate,
     config,
     prevState,
-    manualSnapshot
+    manualSnapshot,
+    meterState
   );
 
   if (rows.length > 0) {
@@ -63,13 +65,9 @@ function NT_taoHoacCapNhatSheetThang_(monthDate, isUpdate) {
   );
 }
 
-function NT_taoDuLieuThang_(groups, monthDate, config, prevState, manualSnapshot) {
-  const daysInMonth = new Date(
-    monthDate.getFullYear(),
-    monthDate.getMonth() + 1,
-    0
-  ).getDate();
-
+function NT_taoDuLieuThang_(groups, monthDate, config, prevState, manualSnapshot, meterState) {
+  const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+  const daysInMonth = monthEnd.getDate();
   const rows = [];
 
   groups.forEach(group => {
@@ -84,14 +82,26 @@ function NT_taoDuLieuThang_(groups, monthDate, config, prevState, manualSnapshot
     const peopleCount = validPeople.length;
     const prorateFee = String(config.prorateFee).toUpperCase() === 'CÓ';
     const roomPrev = prevState[group.room] || {};
-    const roomManual = manualSnapshot.byRoom[group.room] || {};
+    const roomMeter = meterState[group.room] || {};
 
     const oldElectric = group.isLastGroupOfRoom
-      ? NT_firstNumber_(roomPrev.nextElectric, roomPrev.oldElectric, roomManual.oldElectric)
+      ? (Object.prototype.hasOwnProperty.call(roomMeter, 'oldElectric')
+          ? roomMeter.oldElectric
+          : NT_firstNumber_(roomPrev.nextElectric, roomPrev.oldElectric))
+      : '';
+
+    const newElectric = group.isLastGroupOfRoom
+      ? (Object.prototype.hasOwnProperty.call(roomMeter, 'newElectric') ? roomMeter.newElectric : '')
       : '';
 
     const oldWater = group.isLastGroupOfRoom
-      ? NT_firstNumber_(roomPrev.nextWater, roomPrev.oldWater, roomManual.oldWater)
+      ? (Object.prototype.hasOwnProperty.call(roomMeter, 'oldWater')
+          ? roomMeter.oldWater
+          : NT_firstNumber_(roomPrev.nextWater, roomPrev.oldWater))
+      : '';
+
+    const newWater = group.isLastGroupOfRoom
+      ? (Object.prototype.hasOwnProperty.call(roomMeter, 'newWater') ? roomMeter.newWater : '')
       : '';
 
     const carryDebt = group.isLastGroupOfRoom ? NT_asNumber_(roomPrev.debt) : 0;
@@ -106,7 +116,6 @@ function NT_taoDuLieuThang_(groups, monthDate, config, prevState, manualSnapshot
       const saved = manualSnapshot.byPerson[personKey] || {};
       const row = new Array(NT.MONTH_COLS).fill('');
 
-      // STT chỉ cấp sau khi xác nhận đây là một dòng khách hợp lệ.
       row[0] = rows.length + 1;
       row[1] = NT_tangTuPhong_(group.room);
       row[2] = leader ? group.room : '';
@@ -120,11 +129,17 @@ function NT_taoDuLieuThang_(groups, monthDate, config, prevState, manualSnapshot
       if (!person.residenceDeadline) {
         row[9] = 'Chưa đăng ký';
       } else {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
         const deadline = new Date(person.residenceDeadline);
         deadline.setHours(0, 0, 0, 0);
-        row[9] = deadline < today ? 'Hết hạn' : 'Đã có';
+        const compareDate = new Date(monthEnd);
+        compareDate.setHours(0, 0, 0, 0);
+        const diffDays = Math.round((deadline - compareDate) / (24 * 60 * 60 * 1000));
+
+        if (diffDays >= 0) {
+          row[9] = 'Còn ' + diffDays + ' ngày';
+        } else {
+          row[9] = 'Hết hạn ' + Math.abs(diffDays) + ' ngày';
+        }
       }
       row[10] = person.residenceDeadline || '';
 
@@ -144,9 +159,9 @@ function NT_taoDuLieuThang_(groups, monthDate, config, prevState, manualSnapshot
 
         if (group.isLastGroupOfRoom) {
           row[14] = oldElectric;
-          row[15] = NT_coGiaTri_(saved.newElectric) ? saved.newElectric : '';
+          row[15] = newElectric;
           row[17] = oldWater;
-          row[18] = NT_coGiaTri_(saved.newWater) ? saved.newWater : '';
+          row[18] = newWater;
         }
 
         row[21] = NT_coGiaTri_(saved.paid) ? saved.paid : '';
@@ -188,18 +203,12 @@ function NT_luuDuLieuNhapTay_(sheet) {
 
     const personKey = NT_khoaDongThang_(currentRoom, NT_text_(r[4]), NT_text_(r[3]));
     result.byPerson[personKey] = {
-      newElectric: r[15],
-      newWater: r[18],
       paid: r[21],
       paymentMethod: NT_text_(r[22]),
       note: NT_text_(r[24])
     };
 
     if (!result.byRoom[currentRoom]) result.byRoom[currentRoom] = {};
-    if (NT_coGiaTri_(r[14])) result.byRoom[currentRoom].oldElectric = r[14];
-    if (NT_coGiaTri_(r[15])) result.byRoom[currentRoom].newElectric = r[15];
-    if (NT_coGiaTri_(r[17])) result.byRoom[currentRoom].oldWater = r[17];
-    if (NT_coGiaTri_(r[18])) result.byRoom[currentRoom].newWater = r[18];
   });
 
   return result;
