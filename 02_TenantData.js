@@ -40,8 +40,6 @@ function NT_docSheetDangThue_() {
       };
     }
 
-    // Dùng giá trị hiển thị cho các trường văn bản để không mất tên/CCCD
-    // do định dạng số, công thức hoặc kiểu dữ liệu đặc biệt trong sheet nguồn.
     const name = NT_text_(d[7]);
     const id = NT_text_(d[10]);
     if (!name && !id) return;
@@ -184,7 +182,6 @@ function NT_lapNhomThueTrongThang_(records, monthDate) {
   const map = new Map();
 
   records.forEach(r => {
-    // Không tạo dòng rỗng trong bảng tháng.
     if (!NT_text_(r.name) && !NT_text_(r.id)) return;
 
     const effective = r.effectiveDate || r.contractDate || monthStart;
@@ -250,12 +247,13 @@ function NT_lapNhomThueTrongThang_(records, monthDate) {
 
 function NT_demPhongTrongCuoiThang_(monthDate) {
   const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+  const sourceRoomState = NT_docTrangThaiPhongNguon_();
   const currentRecords = NT_docSheetDangThue_();
   const returnedRecords = NT_docSheetTraPhong_();
   const mergedRecords = NT_gopVaLoaiTrungKhach_(currentRecords, returnedRecords);
 
   const allRooms = new Set();
-  currentRecords.forEach(r => r.room && allRooms.add(r.room));
+  sourceRoomState.allRooms.forEach(room => allRooms.add(room));
   returnedRecords.forEach(r => r.room && allRooms.add(r.room));
 
   const occupiedRooms = new Set();
@@ -266,6 +264,10 @@ function NT_demPhongTrongCuoiThang_(monthDate) {
     const notReturnedByMonthEnd = !r.returnDate || r.returnDate > monthEnd;
     if (startedByMonthEnd && notReturnedByMonthEnd) occupiedRooms.add(r.room);
   });
+
+  // Phòng được khai báo tại TH thuê trọ nhưng toàn bộ thông tin người thuê trống
+  // luôn được xem là phòng trống.
+  sourceRoomState.vacantRooms.forEach(room => occupiedRooms.delete(room));
 
   let vacant = 0;
   allRooms.forEach(room => {
