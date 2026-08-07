@@ -12,26 +12,47 @@ function NT_taoTongCongVaDashboard_(sheet, monthDate) {
   sheet.setFrozenColumns(0);
   sheet.setFrozenRows(0);
 
-  sheet.getRange(totalRow, 1, 1, NT.MONTH_COLS).breakApart().clearContent().clearFormat();
-  sheet.getRange(totalRow, 1, 1, 11).merge();
+  // Dòng tổng cộng tuyệt đối không gộp ô để tránh xung đột với cố định hàng/cột.
+  sheet.getRange(totalRow, 1, 1, NT.MONTH_COLS)
+    .breakApart()
+    .clearContent()
+    .clearFormat();
   sheet.getRange(totalRow, 1).setValue('TỔNG CỘNG');
 
   [12, 13, 14, 17, 20, 21, 22, 24].forEach(col => {
     const letter = NT_colToLetter_(col);
-    sheet.getRange(totalRow, col).setFormula('=SUM(' + letter + NT.MONTH_DATA_ROW + ':' + letter + lastDataRow + ')');
+    sheet.getRange(totalRow, col).setFormula(
+      '=SUM(' + letter + NT.MONTH_DATA_ROW + ':' + letter + lastDataRow + ')'
+    );
   });
 
   sheet.getRange(totalRow, 1, 1, NT.MONTH_COLS)
-    .setFontFamily('Times New Roman').setFontSize(11).setFontWeight('bold')
-    .setVerticalAlignment('middle').setBackground('#1f4e78').setFontColor('#ffffff');
-  sheet.getRange(totalRow, 1, 1, 11).setHorizontalAlignment('center');
+    .setFontFamily('Times New Roman')
+    .setFontSize(11)
+    .setFontWeight('bold')
+    .setVerticalAlignment('middle')
+    .setBackground('#1f4e78')
+    .setFontColor('#ffffff');
+
+  sheet.getRange(totalRow, 1).setHorizontalAlignment('left');
 
   [12, 13, 14, 17, 20, 21, 22, 24].forEach(col => {
-    sheet.getRange(totalRow, col).setHorizontalAlignment('right').setNumberFormat(NT.CURRENCY_FORMAT);
+    sheet.getRange(totalRow, col)
+      .setHorizontalAlignment('right')
+      .setNumberFormat(NT.CURRENCY_FORMAT);
   });
 
   sheet.getRange(totalRow, 1, 1, NT.MONTH_COLS)
-    .setBorder(true, true, true, true, true, true, '#000000', SpreadsheetApp.BorderStyle.DOUBLE);
+    .setBorder(
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      '#000000',
+      SpreadsheetApp.BorderStyle.DOUBLE
+    );
 
   sheet.getRange(1, 1, 4, NT.MONTH_COLS).breakApart().clearContent().clearFormat();
   sheet.getRange(1, 1, 1, NT.MONTH_COLS).merge();
