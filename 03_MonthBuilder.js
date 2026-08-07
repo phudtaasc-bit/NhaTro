@@ -65,29 +65,100 @@ function NT_taoHoacCapNhatSheetThang_(monthDate, isUpdate) {
   );
 }
 
-function NT_taoDuLieuThang_(groups, monthDate, config, prevState, manualSnapshot, meterState) {
+/**
+ * Xác định ngày chu kỳ trong một tháng, có xử lý các ngày 29, 30, 31.
+ * Ví dụ ngày chu kỳ là 31 nhưng tháng chỉ có 30 ngày thì dùng ngày 30.
+ */
+function NT_ngayChuKy_(year, monthIndex, billingDay) {
+  const lastDay = new Date(year, monthIndex + 1, 0).getDate();
+  return new Date(year, monthIndex, Math.min(billingDay, lastDay));
+}
+
+/**
+ * Tính tiền phòng theo chu kỳ ngày hiệu lực/ngày ký hợp đồng.
+ *
+ * - Không trả phòng trong tháng báo cáo: thu đủ một tháng.
+ * - Có trả phòng trong tháng báo cáo: xác định chu kỳ gần nhất bắt đầu
+ *   vào ngày thuê của tháng trước hoặc tháng hiện tại, rồi tính tiền từ
+ *   đầu chu kỳ đến hết ngày trả phòng theo số ngày thực tế của chu kỳ.
+ *
+ * Ví dụ: hiệu lực 05/08, trả 02/09:
+ * chu kỳ là 05/08-04/09, tính tiền 05/08-02/09 = 29/31 chu kỳ.
+ */
+function NT_tinhTienPhongTheoChuKy_(group, monthDate) {
+  const rent = Math.round(group.rent || 0);
   const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+  const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+  const returnDate = NT_asDate_(group.returnDate);
+
+  if (!returnDate || returnDate < monthStart || returnDate > monthEnd) {
+    return {
+      amount: rent,
+      start: group.start,
+      end: group.end,
+      chargedDays: null,
+      cycleDays: null,
+      isProratedByCycle: false
+    };
+  }
+
+  const anchor = NT_asDate_(group.effectiveDate) ||
+    NT_asDate_(group.contractDate) ||
+    NT_asDate_(group.start) ||
+    monthStart;
+  const billingDay = anchor.getDate();
+
+  let cycleStart = NT_ngayChuKy_(
+    returnDate.getFullYear(),
+    returnDate.getMonth(),
+    billingDay
+  );
+
+  if (cycleStart > returnDate) {
+    cycleStart = NT_ngayChuKy_(
+      returnDate.getFullYear(),
+      returnDate.getMonth() - 1,
+      billingDay
+    );
+  }
+
+  const nextCycleStart = NT_ngayChuKy_(
+    cycleStart.getFullYear(),
+    cycleStart.getMonth() + 1,
+    billingDay
+  );
+  const cycleEnd = new Date(nextCycleStart);
+  cycleEnd.setDate(cycleEnd.getDate() - 1);
+
+  const chargedDays = NT_daysInclusive_(cycleStart, returnDate);
+  const cycleDays = NT_daysInclusive_(cycleStart, cycleEnd);
+  const amount = Math.round(rent * chargedDays / cycleDays);
+
+  return {
+    amount: amount,
+    start: cycleStart,
+    end: returnDate,
+    chargedDays: chargedDays,
+    cycleDays: cycleDays,
+    isProratedByCycle: true
+  };
+}
+
+function NT_taoDuLieuThang_(groups, monthDate, config, prevState, manualSnapshot, meterState) {
   const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
   const daysInMonth = monthEnd.getDate();
   const rows = [];
 
   groups.forEach(group => {
     const occupiedDays = NT_daysInclusive_(group.start, group.end);
+    const rentInfo = NT_tinhTienPhongTheoChuKy_(group, monthDate);
+    const roomRent = rentInfo.amount;
 
-    /*
-     * Nguyên tắc tiền phòng:
-     * - Tháng bắt đầu thuê và các tháng đang ở: thu đủ một tháng, kể cả vào giữa tháng.
-     * - Chỉ trong tháng có ngày trả phòng mới tính theo số ngày thực tế đã ở,
-     *   tính cả ngày trả phòng và theo đúng số ngày của tháng đó.
-     */
-    const returnInReportMonth = group.returnDate instanceof Date &&
-      !isNaN(group.returnDate) &&
-      group.returnDate >= monthStart &&
-      group.returnDate <= monthEnd;
-
-    const roomRent = returnInReportMonth
-      ? Math.round((group.rent || 0) * occupiedDays / daysInMonth)
-      : Math.round(group.rent || 0);
+    group.billingStart = rentInfo.start;
+    group.billingEnd = rentInfo.end;
+    group.billingDays = rentInfo.chargedDays;
+    group.billingCycleDays = rentInfo.cycleDays;
+    group.isProratedByCycle = rentInfo.isProratedByCycle;
 
     const validPeople = (group.people || []).filter(person => {
       return NT_coGiaTri_(NT_text_(person.name)) || NT_coGiaTri_(NT_text_(person.id));
