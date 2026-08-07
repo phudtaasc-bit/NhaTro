@@ -1,8 +1,6 @@
 /**
  * QUẢN LÝ NHÀ TRỌ - GOOGLE APPS SCRIPT
- * Phiên bản module hóa: 1.2
- * Sheet nguồn: TH thuê trọ, Trả phòng
- * Sheet tháng: Tháng M.YYYY
+ * Phiên bản module hóa: 1.4
  */
 
 function onOpen() {
@@ -18,6 +16,7 @@ function onOpen() {
     .addItem('Kiểm tra dữ liệu nguồn', 'NT_kiemTraDuLieuNguon')
     .addToUi();
 }
+
 function NT_taoThangTiepTheo() {
   const ss = SpreadsheetApp.getActive();
   NT_taoHoacCapNhatCauHinh();
@@ -33,6 +32,7 @@ function NT_taoThangTiepTheo() {
   const next = new Date(latest.year, latest.month, 1);
   NT_taoHoacCapNhatSheetThang_(next, false);
 }
+
 function NT_taoThangTheoLuaChon() {
   const ui = SpreadsheetApp.getUi();
   const response = ui.prompt(
@@ -52,6 +52,28 @@ function NT_taoThangTheoLuaChon() {
   NT_taoHoacCapNhatCauHinh();
   NT_taoHoacCapNhatSheetThang_(monthDate, false);
 }
+
+/**
+ * Xóa toàn bộ dữ liệu và định dạng do lần chạy trước tạo ra.
+ * Giữ nguyên bản thân sheet, kích thước cột và số lượng hàng/cột.
+ */
+function NT_xoaSachSheetThangTruocKhiCapNhat_(sheet) {
+  sheet.setFrozenRows(0);
+  sheet.setFrozenColumns(0);
+  sheet.setConditionalFormatRules([]);
+
+  const allRange = sheet.getRange(
+    1,
+    1,
+    sheet.getMaxRows(),
+    sheet.getMaxColumns()
+  );
+
+  allRange.breakApart();
+  allRange.clear();
+  allRange.clearNote();
+}
+
 function NT_capNhatThangHienTai() {
   const sheet = SpreadsheetApp.getActiveSheet();
   const monthDate = NT_layThangTuTenSheet_(sheet.getName());
@@ -64,8 +86,10 @@ function NT_capNhatThangHienTai() {
   }
 
   NT_taoHoacCapNhatCauHinh();
+  NT_xoaSachSheetThangTruocKhiCapNhat_(sheet);
   NT_taoHoacCapNhatSheetThang_(monthDate, true);
 }
+
 function NT_tinhLaiThangHienTai() {
   const sheet = SpreadsheetApp.getActiveSheet();
   const monthDate = NT_layThangTuTenSheet_(sheet.getName());
