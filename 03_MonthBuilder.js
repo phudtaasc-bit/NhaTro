@@ -66,13 +66,29 @@ function NT_taoHoacCapNhatSheetThang_(monthDate, isUpdate) {
 }
 
 function NT_taoDuLieuThang_(groups, monthDate, config, prevState, manualSnapshot, meterState) {
+  const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
   const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
   const daysInMonth = monthEnd.getDate();
   const rows = [];
 
   groups.forEach(group => {
     const occupiedDays = NT_daysInclusive_(group.start, group.end);
-    const proratedRent = Math.round((group.rent || 0) * occupiedDays / daysInMonth);
+
+    /*
+     * Nguyên tắc tiền phòng:
+     * - Tháng bắt đầu thuê và các tháng đang ở: thu đủ một tháng, kể cả vào giữa tháng.
+     * - Chỉ trong tháng có ngày trả phòng mới tính theo số ngày thực tế đã ở,
+     *   tính cả ngày trả phòng và theo đúng số ngày của tháng đó.
+     */
+    const returnInReportMonth = group.returnDate instanceof Date &&
+      !isNaN(group.returnDate) &&
+      group.returnDate >= monthStart &&
+      group.returnDate <= monthEnd;
+
+    const roomRent = returnInReportMonth
+      ? Math.round((group.rent || 0) * occupiedDays / daysInMonth)
+      : Math.round(group.rent || 0);
+
     const validPeople = (group.people || []).filter(person => {
       return NT_coGiaTri_(NT_text_(person.name)) || NT_coGiaTri_(NT_text_(person.id));
     });
@@ -155,7 +171,7 @@ function NT_taoDuLieuThang_(groups, monthDate, config, prevState, manualSnapshot
         }
 
         row[12] = group.deposit || '';
-        row[13] = proratedRent;
+        row[13] = roomRent;
 
         if (group.isLastGroupOfRoom) {
           row[14] = oldElectric;
