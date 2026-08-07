@@ -7,7 +7,12 @@ function NT_taoTongCongVaDashboard_(sheet, monthDate) {
 
   const sep = NT_formulaSeparator_();
   const totalRow = lastDataRow + 1;
-  const vacantRooms = NT_demPhongTrongCuoiThang_(monthDate);
+  const vacantRoomList = typeof NT_layDanhSachPhongTrongCuoiThang_ === 'function'
+    ? NT_layDanhSachPhongTrongCuoiThang_(monthDate)
+    : [];
+  const vacantRooms = vacantRoomList.length > 0
+    ? vacantRoomList.length
+    : NT_demPhongTrongCuoiThang_(monthDate);
 
   sheet.setFrozenColumns(0);
   sheet.setFrozenRows(0);
@@ -90,6 +95,14 @@ function NT_taoTongCongVaDashboard_(sheet, monthDate) {
       sheet.getRange(rowIndex + 2, startCol + 3, 1, 3).merge().setFormula(item[1]);
     });
   });
+
+  // Gắn danh sách phòng trống trực tiếp vào ô giá trị J4:L4.
+  // Ghi chú hiển thị ổn định khi di chuột hoặc chọn ô, không phụ thuộc trigger chọn ô.
+  const vacantValueRange = sheet.getRange(4, 10, 1, 3);
+  const vacantNote = vacantRoomList.length > 0
+    ? 'Danh sách phòng trống (' + vacantRoomList.length + ' phòng):\n' + vacantRoomList.join(', ')
+    : 'Không có phòng trống.';
+  vacantValueRange.setNote(vacantNote);
 
   sheet.getRange(2, 1, 3, 24)
     .setFontFamily('Times New Roman').setFontSize(11).setVerticalAlignment('middle')
