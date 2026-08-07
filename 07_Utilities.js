@@ -67,17 +67,25 @@ function NT_ghepGhiChu_(savedNote, group, occupiedDays, daysInMonth, debt, leade
   const parts = [];
 
   if (leader) {
-    parts.push(
-      'Tính tiền từ ' +
-      NT_formatDate_(group.start) +
-      ' đến ' +
-      NT_formatDate_(group.end) +
-      ' (' +
-      occupiedDays +
-      '/' +
-      daysInMonth +
-      ' ngày)'
-    );
+    if (
+      group.isProratedByCycle &&
+      group.billingStart instanceof Date &&
+      group.billingEnd instanceof Date
+    ) {
+      parts.push(
+        'Quyết toán chu kỳ từ ' +
+        NT_formatDate_(group.billingStart) +
+        ' đến ' +
+        NT_formatDate_(group.billingEnd) +
+        ' (' +
+        group.billingDays +
+        '/' +
+        group.billingCycleDays +
+        ' ngày chu kỳ)'
+      );
+    } else {
+      parts.push('Thu đủ tiền phòng tháng');
+    }
 
     if (group.groupCountInRoom > 1) {
       parts.push(
@@ -97,6 +105,8 @@ function NT_ghepGhiChu_(savedNote, group, occupiedDays, daysInMonth, debt, leade
     const cleaned = String(savedNote)
       .replace(/Nợ chuyển tháng trước:\s*[\d\.,]+/gi, '')
       .replace(/Tính tiền từ.*?\(\d+\/\d+\s+ngày\)/gi, '')
+      .replace(/Quyết toán chu kỳ từ.*?\(\d+\/\d+\s+ngày chu kỳ\)/gi, '')
+      .replace(/Thu đủ tiền phòng tháng/gi, '')
       .replace(/Đợt thuê\s+\d+\/\d+/gi, '')
       .replace(/\s*;\s*;\s*/g, '; ')
       .replace(/^\s*;\s*|\s*;\s*$/g, '')
